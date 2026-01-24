@@ -1,0 +1,31 @@
+const CTRL = "http://192.168.56.105:8080"; // VM IP
+
+function loadPorts() {
+    const dst = document.getElementById("dst_ip").value;
+
+    fetch(`${CTRL}/ports?dst=${dst}`)
+        .then(res => res.json())
+        .then(data => {
+            const select = document.getElementById("out_port");
+            select.innerHTML = "";
+
+            data.ports.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p;
+                opt.text = `Port ${p}`;
+                select.appendChild(opt);
+            });
+        });
+}
+
+function steerTraffic() {
+    fetch(`${CTRL}/steer`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            src_ip: src_ip.value,
+            dst_ip: dst_ip.value,
+            out_port: parseInt(out_port.value)
+        })
+    }).then(() => status.innerText =  Steering applied");
+}

@@ -1,0 +1,335 @@
+# **SDN Traffic Steering Project: Beginner-Friendly, Step-by-Step Guide**
+
+**Goal:** Build a reproducible SDN lab where a Python Ryu controller steers traffic between hosts using Open vSwitches in Mininet. You will understand the **control plane, data plane, OpenFlow, and traffic steering**.
+
+---
+
+## **1️⃣ Understanding the Core Concepts (Before You Code)**
+
+Before touching any scripts, here’s what you need to know:
+
+| Concept                           | Explanation                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| SDN (Software Defined Networking) | Separates **control plane** (decision-making) from **data plane** (forwarding). |
+| Controller                        | The “brain” that decides how switches forward packets (e.g., Ryu).              |
+| OpenFlow                          | Protocol used by controllers to talk to switches (e.g., Ryu → OVS).             |
+| Mininet                           | Simulated network environment (hosts + switches) on a single machine.           |
+| Ryu                               | Python-based SDN controller that talks OpenFlow 1.3.                            |
+| OVS (Open vSwitch)                | Virtual switch that supports OpenFlow, runs in your VM kernel.                  |
+
+**Key idea:** In your project:
+
+```
+Mininet VM
+├── Hosts (h1, h2)
+├── Switches (s1, s2)
+└── Ryu Controller (Python, port 6653)
+```
+
+* Hosts send traffic → Switches forward according to flows installed by the controller.
+* Controller decides traffic steering and installs flow rules.
+
+---
+
+## **2️⃣ Folder Structure (Project Organization)**
+
+Create a folder called `sdn-traffic-steering`:
+
+```
+sdn-traffic-steering/
+│
+├── mininet/             # Mininet topology scripts
+│   └── topo.py
+├── ryu/                 # Ryu controller scripts
+│   └── traffic_steering.py
+├── logs/                # Optional: ping, flow dumps, debug info
+├── README.md            # Document your work
+└── run_demo.sh          # Optional: automate controller + Mininet
+```
+
+**Why this is important:**
+
+* Keeps code **organized and reproducible**.
+* Separates **control plane** (Ryu) from **data plane** (Mininet).
+* Makes it **easy to demo and explain** in interviews.
+
+---
+
+## **3️⃣ Setting Up the Environment**
+
+We’ll assume you have **Mininet installed on Ubuntu VM** (recommended over Windows):
+
+1. Update packages:
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+2. Install Python3 and pip:
+
+```bash
+sudo apt install -y python3 python3-pip
+```
+
+3. Install Mininet (if not already installed):
+
+```bash
+sudo apt install -y mininet
+```
+
+4. Install Ryu:
+
+```bash
+pip3 install ryu
+```
+
+5. Verify Ryu installation:
+
+```bash
+ryu-manager --version
+```
+
+> At this point, your **environment is ready**: Mininet + Python + Ryu.
+
+---
+
+## **4️⃣ Writing Your Mininet Topology**
+
+File: `sdn-traffic-steering/mininet/topo.py`
+
+### **Code with step-by-step explanation**
+
+```python
+from mininet.net import Mininet
+from mininet.topo import Topo
+from mininet.node import RemoteController, OVSSwitch
+from mininet.cli import CLI
+from mininet.log import setLogLevel
+
+# Step 1: Define a topology class
+class MyTopo(Topo):
+    def build(self):
+        # Step 1a: Add switches
+        s1 = self.addSwitch('s1')
+        s2 = self.addSwitch('s2')
+        
+        # Step 1b: Add hosts
+        h1 = self.addHost('h1', ip='10.0.0.1/24')
+        h2 = self.addHost('h2', ip='10.0.0.2/24')
+        
+        # Step 1c: Connect hosts to switches
+        self.addLink(h1, s1)
+        self.addLink(h2, s2)
+        
+        # Step 1d: Connect switches together
+        self.addLink(s1, s2)
+
+# Step 2: Function to start Mininet with remote controller
+def run():
+    # Use RemoteController (Ryu will run separately)
+    net = Mininet(
+        topo=MyTopo(),
+        controller=lambda name: RemoteController(name, ip='127.0.0.1', port=6653),
+        switch=OVSSwitch,   # Ensures OpenFlow 1.3 compatibility
+        autoSetMacs=True
+    )
+    
+    # Start network
+    net.start()
+    
+    print("Pingall test to verify connectivity:")
+    net.pingAll()  # Verifies data plane
+    
+    # Open Mininet CLI for interactive commands
+    CLI(net)
+    
+    # Stop network after CLI exit
+    net.stop()
+
+if __name__ == '__main__':
+    setLogLevel('info')
+    run()
+```
+
+**Why each step is important:**
+
+* `RemoteController` → Connects to **Ryu**, not local Mininet default.
+* `OVSSwitch` → Ensures **OpenFlow 1.3**, avoids silent fallback.
+* `pingAll()` → Verifies **hosts can communicate**.
+* `CLI(net)` → Allows you to check flows, dump tables, etc.
+
+---
+
+## **5️⃣ Writing Your Ryu Controller**
+
+File: `sdn-traffic-steering/ryu/traffic_steering.py`
+
+### **Basic Ryu app to validate connectivity**
+
+```python
+from ryu.base import app_manager
+from ryu.controller import ofp_event
+from ryu.controller.handler import MAIN_DISPATCHER, set_ev_cls
+from ryu.ofproto import ofproto_v1_3
+
+class TrafficSteering(app_manager.RyuApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
+    def __init__(self, *args, **kwargs):
+        super(TrafficSteering, self).__init__(*args, **kwargs)
+
+    # Step 1: Handle switch connection
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, MAIN_DISPATCHER)
+    def switch_features_handler(self, ev):
+        datapath = ev.msg.datapath  # The switch that connected
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        # Step 2: Install table-miss flow
+        match = parser.OFPMatch()  # Matches everything
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+        
+        mod = parser.OFPFlowMod(
+            datapath=datapath,
+            priority=0,
+            match=match,
+            instructions=inst
+        )
+        
+        datapath.send_msg(mod)
+```
+
+**Why this works:**
+
+* Every packet not matching any flow goes to the controller.
+* Ensures **control plane is alive**.
+* You can safely **add traffic steering logic next**.
+
+---
+
+## **6️⃣ Running the Demo Step-by-Step**
+
+1. Open **two terminals** inside your VM.
+
+**Terminal 1:** Start Ryu
+
+```bash
+cd sdn-traffic-steering/ryu
+ryu-manager traffic_steering.py
+```
+
+**Terminal 2:** Start Mininet
+
+```bash
+cd sdn-traffic-steering/mininet
+sudo python3 topo.py
+```
+
+* `pingAll()` should show **0% packet loss**.
+* Use Mininet CLI to inspect switches:
+
+```bash
+mininet> sh ovs-ofctl show s1
+mininet> sh ovs-ofctl dump-flows s1
+```
+
+* You should see **table-miss entry pointing to CONTROLLER**.
+
+---
+
+## **7️⃣ Optional: Automate with `run_demo.sh`**
+
+File: `sdn-traffic-steering/run_demo.sh`
+
+```bash
+#!/bin/bash
+
+# Start Ryu controller in background
+ryu-manager ryu/traffic_steering.py &
+
+# Wait 2 seconds for controller to be ready
+sleep 2
+
+# Start Mininet topology
+sudo python3 mininet/topo.py
+```
+
+* Makes demo **repeatable for presentation**.
+* Use: `bash run_demo.sh`
+
+---
+
+## **8️⃣ Extending to Traffic Steering**
+
+Once connectivity works:
+
+1. Inside `traffic_steering.py`, match packets by **source IP** or **destination IP**.
+2. Forward to a specific port:
+
+```python
+match = parser.OFPMatch(ipv4_src='10.0.0.1')
+actions = [parser.OFPActionOutput(2)]  # Send out port 2
+```
+
+* Now you are steering traffic **programmatically**.
+* Keep it simple for interview: 2 hosts, 2 switches, deterministic paths.
+
+---
+
+## **9️⃣ Interview-Level Explanation**
+
+When asked:
+
+**Q: Why ONOS failed?**
+
+> Docker on Windows introduces NAT/bridge layers. OpenFlow TCP handshake from Mininet is unreliable.
+
+**Q: Why Ryu?**
+
+> Native Python, deterministic OpenFlow 1.3, easy to inspect, Mininet-friendly.
+
+**Q: How do you verify SDN is working?**
+
+> `pingAll()` → connectivity; `ovs-ofctl dump-flows` → table-miss flows; switches connected → controller logs.
+
+**Q: Control vs data plane?**
+
+> Controller (Ryu) = brain, installs flows; Switches (OVS) = muscle, forwards packets independently.
+
+---
+
+## **10️⃣ Key Tips to Ace the Presentation**
+
+* Start by showing **folder structure** → shows engineering discipline.
+* Show **Mininet topology diagram** → explain hosts/switches.
+* Run `pingAll()` → 0% packet loss.
+* Show **Ryu controller logs** → connection established.
+* Explain **table-miss flow** → step towards traffic steering.
+* Optionally, demonstrate **traffic steering** for one host → simple match + output.
+
+---
+
+## ✅ **Summary Roadmap for Your Project**
+
+1. Install Mininet, Python, Ryu.
+2. Create project folder with `mininet/`, `ryu/`.
+3. Write topology in `topo.py`.
+4. Write basic controller in `traffic_steering.py`.
+5. Verify OpenFlow handshake with `pingAll()` + `ovs-ofctl dump-flows`.
+6. Add traffic steering logic (optional).
+7. Automate with `run_demo.sh`.
+8. Prepare slides + explanations.
+9. Practice demo + viva answers.
+
+---
+
+I can now **create a single fully copy-pasteable beginner-ready command + script bundle** that will:
+
+* Set up Ryu
+* Run Mininet topology
+* Show 0% packet loss
+* Be **presentation-ready**
+

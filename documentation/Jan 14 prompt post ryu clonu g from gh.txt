@@ -1,0 +1,314 @@
+🧠 MASTER SDN PROJECT PROMPT
+
+(Ryu + Mininet | Traffic Steering | Interview-Ready)
+
+📌 CONTEXT (DO NOT SKIP)
+
+You are working on a clean, professional SDN lab using:
+
+Mininet VM
+
+Ryu controller (GitHub cloned, NOT pip-installed)
+
+Python 3
+
+OpenFlow 1.3 only
+
+Explicit execution:
+python3 ~/ryu/bin/ryu-manager <controller.py>
+
+PYTHONPATH set to:
+/home/mininet/ryu
+
+No system or pip-installed Ryu exists
+
+Project root:
+
+~/sdn-traffic-steering/
+├── controller/
+│   └── traffic_steering.py
+├── topology/
+│   ├── simple_topo.py
+│   └── (future multi-switch topologies)
+└── logs/
+
+
+A minimal, ping-safe controller is already working:
+
+Table-miss → controller
+
+PacketIn handling
+
+Flood-based forwarding
+
+Verified with pingall
+
+🎯 PROJECT GOAL (HIGH-LEVEL)
+
+Evolve from a minimal SDN controller into a real traffic-steering controller that:
+
+Controls forwarding decisions explicitly
+
+Supports multi-switch topologies
+
+Classifies traffic (ICMP / TCP / UDP)
+
+Applies policy-based steering
+
+Uses flow priorities correctly
+
+Is demo-ready and interview-ready
+
+Maps conceptually to 5G user-plane (UPF) behavior
+
+🧩 PHASED EXECUTION PLAN (STEP-BY-STEP)
+🔹 PHASE 1 — Baseline Validation (DONE)
+
+Minimal controller works
+
+OpenFlow 1.3 enforced
+
+Controller receives PacketIn
+
+Traffic passes end-to-end
+
+📌 Purpose:
+Prove control plane correctness before adding logic.
+
+🔹 PHASE 2 — MAC Learning (Remove Flooding)
+
+Objective:
+Replace OFPP_FLOOD with deterministic unicast forwarding.
+
+Tasks:
+
+Maintain mac_to_port per switch (dpid-based)
+
+Learn source MAC from PacketIn
+
+Install flows for known destinations
+
+Flood only for unknown MACs
+
+Reduce controller load by proactive flow installation
+
+Outcome:
+
+Acts as an L2 learning switch
+
+No unnecessary flooding
+
+Flow tables populated dynamically
+
+🔹 PHASE 3 — Multi-Switch Topology
+
+Objective:
+Move beyond single-switch demos.
+
+Topology Example:
+
+h1 --- s1 --- s2 --- h2
+          \
+           --- s3 --- h3
+
+
+Tasks:
+
+Create custom Mininet topology with ≥2 switches
+
+Verify DPID awareness in controller
+
+Track MACs per switch
+
+Validate inter-switch forwarding
+
+Observe flow tables per switch
+
+Outcome:
+
+Understanding of distributed forwarding
+
+Clear mental model of data-plane vs control-plane
+
+🔹 PHASE 4 — Traffic Classification
+
+Objective:
+Identify traffic type and treat it differently.
+
+Classification Criteria:
+
+ICMP (ping)
+
+TCP (e.g., iperf)
+
+UDP (e.g., iperf -u)
+
+Optional: port-based (HTTP, DNS)
+
+Implementation:
+
+Parse packets using ryu.lib.packet
+
+Detect:
+
+IPv4
+
+TCP / UDP / ICMP
+
+Log classification decisions
+
+Outcome:
+
+Controller understands what kind of traffic is flowing
+
+🔹 PHASE 5 — Traffic Steering Logic (Core Feature)
+
+Objective:
+Make forwarding decisions based on policy, not just reachability.
+
+Examples:
+
+ICMP → shortest path
+
+TCP → high-bandwidth path
+
+UDP → low-latency path
+
+Specific host → specific path
+
+Implementation:
+
+Use different output ports for different traffic classes
+
+Install flows with:
+
+Match fields (eth, ip, l4)
+
+Explicit priorities
+
+Avoid PacketIn after first packet
+
+Outcome:
+
+True SDN behavior
+
+Intent-based forwarding
+
+Policy-driven network
+
+🔹 PHASE 6 — Flow Priorities & Tables
+
+Objective:
+Demonstrate professional OpenFlow usage.
+
+Tasks:
+
+Use priorities correctly:
+
+High: steering rules
+
+Medium: learned unicast
+
+Low: table-miss
+
+Avoid rule conflicts
+
+Verify with ovs-ofctl dump-flows
+
+Outcome:
+
+Predictable forwarding
+
+Interview-grade OpenFlow understanding
+
+🔹 PHASE 7 — Demo & Validation
+
+Objective:
+Create a repeatable demo.
+
+Demo Script:
+
+Start Ryu
+
+Start Mininet
+
+Show topology
+
+Run pingall
+
+Run iperf (TCP/UDP)
+
+Dump flow tables
+
+Explain why flows exist
+
+Outcome:
+
+Confident live demo
+
+Clear explanation under questioning
+
+🔹 PHASE 8 — Interview-Ready Explanation
+
+Be able to answer:
+
+Why OpenFlow 1.3?
+
+Why table-miss matters?
+
+Why avoid OFPP_NORMAL?
+
+How controller scales?
+
+How this maps to 5G UPF / SMF?
+
+Difference between reactive and proactive flows?
+
+How policies are enforced?
+
+5G Mapping Example:
+
+SDN Concept	5G Concept
+Controller	SMF
+Flow rules	PDR/FAR
+Switch	UPF
+Steering	QoS / slicing
+🔒 HARD RULES (NEVER BREAK)
+
+❌ Never install Ryu via pip or apt
+
+❌ Never rely on OFPP_NORMAL
+
+❌ Never debug before verifying flow tables
+
+✅ Always validate with ovs-ofctl
+
+✅ Always build in small, testable steps
+
+🚀 EXPECTED FINAL OUTCOME
+
+By the end, you will have:
+
+A clean SDN codebase
+
+A working traffic-steering controller
+
+A multi-switch Mininet demo
+
+A clear, confident explanation
+
+A project suitable for:
+
+Interviews
+
+Academic demos
+
+5G / telecom discussions
+
+✅ HOW TO RESUME AFTER BREAK
+
+When you return, say:
+
+“Resume SDN project from Phase 2 (MAC learning) with my clean Ryu + Mininet setup.”
+
+And continue step by step.

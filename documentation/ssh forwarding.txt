@@ -1,0 +1,16 @@
+-X      Enables X11 forwarding.  This can also be specified on a per-host
+         basis in a configuration file.
+
+         X11 forwarding should be enabled with caution.  Users with the
+         ability to bypass file permissions on the remote host (for the
+         user's X authorization database) can access the local X11 display
+         through the forwarded connection.  An attacker may then be able
+         to perform activities such as keystroke monitoring.
+
+         For this reason, X11 forwarding is subjected to X11 SECURITY
+         extension restrictions by default.  Please refer to the ssh -Y
+         option and the ForwardX11Trusted directive in ssh_config(5) for
+         more information.
+
+ -Y      Enables trusted X11 forwarding.  Trusted X11 forwardings are not
+         subjected to the X11 SECURITY extension controls.

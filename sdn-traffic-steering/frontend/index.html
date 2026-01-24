@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SDN Traffic Steering</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>SDN Traffic Steering</h2>
+
+        <label>Source IP</label>
+        <input type="text" id="src_ip" placeholder="10.0.0.1">
+
+        <label>Destination IP</label>
+        <input type="text" id="dst_ip" placeholder="10.0.0.3">
+
+        <label>Select Output Port</label>
+        <select id="out_port">
+            <option value="">-- Select Path --</option>
+        </select>
+
+        <button onclick="steerTraffic()">Steer Traffic</button>
+
+        <p id="status"></p>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

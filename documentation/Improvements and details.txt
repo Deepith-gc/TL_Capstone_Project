@@ -1,0 +1,171 @@
+=====================================================================
+SDN-BASED TRAFFIC STEERING PROJECT
+INTERVIEW & LAB PRESENTATION COMPILATION
+=====================================================================
+
+PROJECT TITLE
+-------------
+SDN-Based Traffic Steering Using Open vSwitch and Controller
+
+---------------------------------------------------------------------
+1. WHAT THIS PROJECT IS (SIMPLE DESCRIPTION)
+---------------------------------------------------------------------
+
+This project demonstrates how a computer network can be controlled
+centrally using software instead of configuring each network device
+manually.
+
+A central controller makes decisions about how traffic should flow,
+and the network switches simply follow those instructions.
+
+This approach is called Software-Defined Networking (SDN) and is
+widely used in modern telecom, cloud, and data center networks.
+
+---------------------------------------------------------------------
+2. WHAT IS TECHNICALLY DEMONSTRATED
+---------------------------------------------------------------------
+
+- Separation of control plane and data plane
+- Centralized decision-making using an SDN controller
+- Dynamic programming of network behavior
+- OpenFlow-based communication between controller and switches
+- Correct handling of ARP and ICMP traffic
+- Flow installation and switch forwarding behavior
+- Deterministic and reproducible network behavior
+
+---------------------------------------------------------------------
+3. WHAT A NON-TECHNICAL REVIEWER SHOULD UNDERSTAND
+---------------------------------------------------------------------
+
+This project shows that:
+
+- Network behavior can be controlled from one place
+- Devices do not make independent decisions anymore
+- The network automatically adapts when traffic appears
+- Policies decide how traffic is handled
+- The system is reliable and predictable
+
+In simple terms:
+“Instead of each road deciding traffic rules, a central traffic control
+system manages all roads together.”
+
+---------------------------------------------------------------------
+4. WHY THIS MATTERS TO A COMPANY
+---------------------------------------------------------------------
+
+- Reduces manual configuration effort
+- Makes networks easier to manage and scale
+- Enables automation and programmability
+- Aligns with modern telecom and cloud architectures
+- Forms the foundation of 5G, NFV, and SDN-based systems
+
+---------------------------------------------------------------------
+5. WHAT IS ACTUALLY SHOWN IN THE LAB
+---------------------------------------------------------------------
+
+- A virtual network with hosts and switches
+- A running SDN controller
+- Live traffic between hosts
+- Controller involvement on first packet
+- Flow rules installed into switches
+- Subsequent packets forwarded directly by switches
+
+Observable proof:
+- Ping works
+- First packet has higher latency
+- Later packets are faster
+- Flow tables contain installed rules
+
+---------------------------------------------------------------------
+6. KEY OBSERVATIONS TO EXPLAIN (INTERVIEW GOLD)
+---------------------------------------------------------------------
+
+1. First packet latency is higher
+   Reason: packet is sent to controller
+
+2. Subsequent packets are faster
+   Reason: flow rule is already installed
+
+3. Network works even after controller decisions
+   Reason: data plane forwards independently
+
+4. ARP must be handled for IP traffic to work
+   Reason: MAC resolution is mandatory
+
+---------------------------------------------------------------------
+7. WHAT TO DEMONSTRATE LIVE (SAFE & IMPRESSIVE)
+---------------------------------------------------------------------
+
+- Start controller
+- Start Mininet topology
+- Run ping between hosts
+- Show successful connectivity
+- Dump flow tables from switches
+- Explain controller logs
+- Optionally stop controller and show existing flows still work
+
+---------------------------------------------------------------------
+8. HOW THIS PROJECT ACES THE INTERVIEW
+---------------------------------------------------------------------
+
+High-impact strengths:
+
+- Clear architecture
+- Incremental development
+- Correct SDN fundamentals
+- Observability through logs and flows
+- Realistic behavior explanation
+- No unnecessary complexity
+
+This shows:
+- Engineering discipline
+- Problem-solving ability
+- System-level thinking
+- Production awareness
+
+---------------------------------------------------------------------
+9. WHAT NOT TO OVERDO (IMPORTANT)
+---------------------------------------------------------------------
+
+Avoid:
+- Heavy GUIs you can’t explain
+- Complex frameworks you didn’t write
+- Advanced features without justification
+- Overengineering for visual appeal
+
+Interviewers prefer:
+- Clear reasoning
+- Correct behavior
+- Confidence in explanation
+
+---------------------------------------------------------------------
+10. IDEAL ONE-LINE SUMMARY (USE THIS)
+---------------------------------------------------------------------
+
+“This project demonstrates centralized, software-controlled networking
+where traffic behavior is dynamically decided by policy rather than
+fixed device configuration.”
+
+---------------------------------------------------------------------
+11. OPTIONAL VISUALIZATION NOTE (IF ASKED)
+---------------------------------------------------------------------
+
+ONOS or similar platforms may be used only for visualization, while
+keeping the control logic simple and explainable.
+
+The focus remains on correctness and understanding, not tooling.
+
+---------------------------------------------------------------------
+12. FINAL INTERVIEW TAKEAWAY
+---------------------------------------------------------------------
+
+This project is not about showing many features.
+It is about showing:
+- understanding
+- correctness
+- explainability
+- relevance to real-world networks
+
+=====================================================================
+END OF COMPILED INTERVIEW & LAB GUIDE
+=====================================================================

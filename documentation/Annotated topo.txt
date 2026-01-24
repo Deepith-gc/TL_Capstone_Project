@@ -1,0 +1,49 @@
+
+
+```
+                   ┌───────┐
+                ┌──│  h1   │
+                │  └───────┘
+                │
+                │
+            ┌───▼───┐
+            │   s1  │
+            └─┬─┬───┘
+              │ │
+      h2      │ └───────────┐
+     ┌─────┐ │             │
+     │ h2  │ │             │
+     └─────┘ │             │
+             │             │
+       ┌─────▼─┐       ┌───▼───┐
+       │  s2   │       │  s3   │
+       └─────┬─┘       └───┬───┘
+             │               │
+        ┌────▼───┐       ┌───▼───┐
+        │  h3    │       │  h4   │
+        └────────┘       └───────┘
+
+Traffic Steering Paths:
+- h1 → h3: s1 → s2
+- h2 → h3: s1 → s3 → s2
+- All other traffic uses normal L2 learning (flood if unknown)
+- TCP/UDP flows logged by controller
+```
+
+**How to annotate for your report/demo:**
+
+1. Use **arrows** to show traffic paths (solid for default, dashed for steered flows).
+2. Label hosts with **priority** (High: h1, Medium: h2, Best-effort: h4).
+3. Label switches as **OpenFlow13 capable**.
+4. Optionally add **controller** at top-left:
+
+   ```
+   ┌─────────┐
+   │ Ryu Ctrl│
+   └─────────┘
+        │
+        ▼
+       s1,s2,s3
+   ```
+
+This version is **perfect for slides or report diagrams**.

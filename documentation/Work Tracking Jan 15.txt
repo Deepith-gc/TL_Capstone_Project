@@ -1,0 +1,87 @@
+Finalised project title as SDN-Based Traffic Steering Using Containerized OVS Data Plane
+Trying to open Docker GUI in ubuntu VM
+	Try to use Portainer(Web Based) for GUI
+
+Shifted back to host os(Windows) system
+
+OVS were used in mininet and controller reachability was tested using ping
+
+Mininet → ONOS control-plane connection is NOT established at all
+ONOS is NOT receiving OpenFlow connections from Mininet
+
+ONOS does NOT automatically start OpenFlow listeners just because the container is running.
+
+
+ENTER THE CONTAINER SHELL(ONOS CLI)
+docker exec -it onos bash
+
+karaf login into cli 
+ Check apps / onos:apps
+
+Can the Mininet VM actually reach the Windows host on TCP 6653?
+ptcp:6654 = passive controller mode
+OVS waits for someone to connect to it
+ONOS never uses this
+With fail_mode: secure
+If controllers conflict or misbehave → NO FLOWS
+	Result:
+		ONOS never completes handshake
+		No devices in ONOS
+		100% ping loss
+
+Failed to add devices to ONOS controller
+ONOS container is running perfectly.
+Karaf shell works.
+OpenFlow handshake from Mininet → ONOS failed.
+⚠️ This is exactly the same problem we predicted:
+“ONOS in Docker on Windows relies on container networking abstractions which introduce nondeterministic OpenFlow connectivity.”
+Even with proper port mapping, ONOS cannot reliably see OVS inside a separate host-only VM.
+This is not a misconfiguration.
+This is platform limitation.
+
+Updated to latest release of Ubuntu 20.4 LTS mininet vm version and tried to setup a topology with a controller.
+
+Controller was listening on 6653 but ping failed
+
+Troubleshooted ping with a proper topology of 3 h & 2s . Adding flow rules is pending.
+
+
+****
+Try for a simple minimal topology and a complex one and also try to use x11(xterm) for ryu controller in frontend
+Xming X server installation for visualization
+****
+
+
+
+Check the Code for Correct Imports
+The error specifically refers to the line:
+from ryu.lib.packet import packet, ethernet, ip
+In newer versions of Ryu, the import structure for IP packets might have changed. To troubleshoot:
+First, check if ip is available by listing the contents of ryu.lib.packet:
+ls /usr/local/lib/python3.8/dist-packages/ryu/lib/packet/
+If ip.py is not present, you may need to modify the import statement. For example, in newer versions of Ryu, the ip module is often imported like this:
+from ryu.lib.packet import ipv4
+So, you should update your traffic_steering.py script to:
+from ryu.lib.packet import packet, ethernet, ipv4
+
+
+Ryu controller was running from python installed path which was declared global and hence ping was unsuccessful.
+
+
+
+
+
+
+WHY xclock WORKED BUT xterm DID NOT (Interview Gold)
+
+Say this verbatim if asked:
+
+“xclock ran in my user context with valid Xauthority, but Mininet launches host xterms as root via sudo. Without preserving environment variables or Xauthority, root cannot connect to the X server. Using sudo -E or xhost +local: resolves this.”
+mininet@mininet-vm:~$ xhost
+access control disabled, clients can connect from any host
+INET:172.26.144.1
+LOCAL:
+INET:localhost
+mininet@mininet-vm:~$ xhost +local:
+non-network local connections being added to access control list
+mininet@mininet-vm:~$

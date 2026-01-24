@@ -1,0 +1,278 @@
+# ---------------------------- traffic_steering_controller.py ----------------------------
+from ryu.base import app_manager
+from ryu.controller import ofp_event
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import set_ev_cls
+from ryu.ofproto import ofproto_v1_3
+from ryu.lib.packet import packet, ethernet, ipv4, tcp, udp
+
+from ryu.app.wsgi import ControllerBase, WSGIApplication, route
+from webob import Response
+import json
+
+# WSGI app name
+REST_API_NAME = 'steering_api'
+REST_API_INSTANCE = None
+
+class TrafficSteeringSwitch(app_manager.RyuApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
+    _CONTEXTS = {'wsgi': WSGIApplication}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mac_to_port = {}  # L2 MAC table
+        self.steering_policy = {}  # (src_ip, dst_ip) -> out_port
+
+        wsgi = kwargs['wsgi']
+        global REST_API_INSTANCE
+        REST_API_INSTANCE = wsgi.register(SteeringRESTAPI, {REST_API_NAME: self})
+
+        self.logger.info("Traffic Steering Controller Started")
+
+    # ------------------ Switch Table-Miss ------------------
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def switch_features_handler(self, ev):
+        dp = ev.msg.datapath
+        ofp = dp.ofproto
+        parser = dp.ofproto_parser
+
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionOutput(ofp.OFPP_CONTROLLER, ofp.OFPCML_NO_BUFFER)]
+        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
+        mod = parser.OFPFlowMod(datapath=dp, priority=0, match=match, instructions=inst)
+        dp.send_msg(mod)
+        self.logger.info(f"Switch {dp.id} connected")
+
+    # ------------------ Packet Processing ------------------
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    def packet_in_handler(self, ev):
+        msg = ev.msg
+        dp = msg.datapath
+        dpid = dp.id
+        ofp = dp.ofproto
+        parser = dp.ofproto_parser
+        in_port = msg.match['in_port']
+
+        pkt = packet.Packet(msg.data)
+        eth = pkt.get_protocol(ethernet.ethernet)
+        if eth.ethertype == 0x88cc:  # Ignore LLDP
+            return
+
+        src, dst = eth.src, eth.dst
+        self.mac_to_port.setdefault(dpid, {})
+        self.mac_to_port[dpid][src] = in_port
+
+        ip_pkt = pkt.get_protocol(ipv4.ipv4)
+        tcp_pkt = pkt.get_protocol(tcp.tcp)
+        udp_pkt = pkt.get_protocol(udp.udp)
+
+        steering_key = None
+        if ip_pkt and (tcp_pkt or udp_pkt):
+            steering_key = (ip_pkt.src, ip_pkt.dst)
+
+        if steering_key in self.steering_policy:
+            out_port = self.steering_policy[steering_key]
+            self.logger.info(f"Steering {ip_pkt.src} -> {ip_pkt.dst} via port {out_port}")
+        else:
+            if dst in self.mac_to_port[dpid]:
+                out_port = self.mac_to_port[dpid][dst]
+            else:
+                out_port = ofp.OFPP_FLOOD
+
+        actions = [parser.OFPActionOutput(out_port)]
+
+        # ------------------ Install Flow ------------------
+        if out_port != ofp.OFPP_FLOOD:
+            if ip_pkt:
+                match = parser.OFPMatch(eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst)
+            else:
+                match = parser.OFPMatch(eth_src=src, eth_dst=dst)
+
+            inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
+            mod = parser.OFPFlowMod(datapath=dp, priority=10, match=match, instructions=inst)
+            dp.send_msg(mod)
+
+        # ------------------ Send Packet Out ------------------
+        out = parser.OFPPacketOut(datapath=dp, buffer_id=msg.buffer_id, in_port=in_port, actions=actions, data=msg.data)
+        dp.send_msg(out)
+
+# ------------------ REST API ------------------
+class SteeringRESTAPI(ControllerBase):
+    def __init__(self, req, link, data, **config):
+        super().__init__(req, link, data, **config)
+        self.controller = data[REST_API_NAME]
+
+    @route('steer', '/ports', methods=['GET'])
+    def get_ports(self, req, **kwargs):
+        dst = req.params.get('dst')
+        # Find possible output ports for this destination
+        ports = []
+        for policy_dst in self.controller.steering_policy.values():
+            ports.append(policy_dst)
+        resp = Response(content_type='application/json', charset='utf-8', body=json.dumps({'ports': ports}))
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return resp
+
+    @route('steer', '/steer', methods=['POST', 'OPTIONS'])
+    def steer_traffic(self, req, **kwargs):
+        if req.method == 'OPTIONS':
+            resp = Response()
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            return resp
+        try:
+            data = req.json if req.body else {}
+            src_ip = data['src_ip']
+            dst_ip = data['dst_ip']
+            out_port = data['out_port']
+            self.controller.steering_policy[(src_ip, dst_ip)] = out_port
+            resp = Response(content_type='application/json', charset='utf-8', body=json.dumps({'status': 'ok'}))
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            return resp
+        except Exception as e:
+            resp = Response(content_type='application/json', charset='utf-8', body=json.dumps({'status': 'error', 'msg': str(e)}))
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            return resp
+
+# ---------------------------- index.html ----------------------------
+"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SDN Traffic Steering</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>SDN Traffic Steering</h2>
+        <label>Source IP</label>
+        <input type="text" id="src_ip" placeholder="10.0.0.1">
+
+        <label>Destination IP</label>
+        <input type="text" id="dst_ip" placeholder="10.0.0.3">
+
+        <label>Select Output Port</label>
+        <select id="out_port">
+            <option value="">-- Select Path --</option>
+        </select>
+
+        <button onclick="steerTraffic()">Steer Traffic</button>
+        <p id="status"></p>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+"""
+
+# ---------------------------- style.css ----------------------------
+"""
+body {
+    font-family: Arial, sans-serif;
+    background-color: #eef2f3;
+}
+.container {
+    width: 400px;
+    margin: 100px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+}
+label {
+    display: block;
+    margin-top: 10px;
+}
+input, select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+}
+button {
+    width: 100%;
+    margin-top: 15px;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background: #0056b3;
+}
+#status {
+    margin-top: 15px;
+    font-weight: bold;
+    text-align: center;
+}
+"""
+
+# ---------------------------- script.js ----------------------------
+"""
+const CTRL = "http://192.168.56.105:8080";
+
+document.getElementById("dst_ip").addEventListener("change", function() {
+    const dst_ip = this.value;
+    const outPortSelect = document.getElementById("out_port");
+    outPortSelect.innerHTML = "<option value=''>-- Loading --</option>";
+
+    fetch(`${CTRL}/ports?dst=${dst_ip}`)
+        .then(resp => resp.json())
+        .then(data => {
+            outPortSelect.innerHTML = "<option value=''>-- Select Path --</option>";
+            data.ports.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p;
+                opt.text = `Port ${p}`;
+                outPortSelect.add(opt);
+            });
+        })
+        .catch(err => {
+            outPortSelect.innerHTML = "<option value=''>-- Error --</option>";
+        });
+});
+
+function steerTraffic() {
+    const src_ip = document.getElementById("src_ip").value;
+    const dst_ip = document.getElementById("dst_ip").value;
+    const out_port = parseInt(document.getElementById("out_port").value);
+
+    fetch(`${CTRL}/steer`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({src_ip, dst_ip, out_port})
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        document.getElementById("status").innerText = "Traffic steered successfully";
+    })
+    .catch(err => {
+        document.getElementById("status").innerText = "Controller unreachable";
+    });
+}
+"""
+
+# ---------------------------- Notes ----------------------------
+"""
+1. Controller: Run with Ryu:
+
+    ryu-manager traffic_steering_controller.py --observe-links
+
+2. Frontend: Serve on port 8000:
+
+    cd ~/sdn-traffic-steering/frontend
+    python3 -m http.server 8000
+
+3. Browser URL:
+
+    http://192.168.56.105:8000
+
+4. Testing:
+
+    - Change source/dest IP → dropdown updates dynamically.
+    - Select port → click "Steer Traffic" → controller installs flow.
+    - Use 'ovs-ofctl dump-flows <switch>' in Mininet to verify.
+    - Ping between hosts to show traffic is steered.
+"""

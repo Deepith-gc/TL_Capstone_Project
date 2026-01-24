@@ -1,0 +1,183 @@
+You are an expert SDN architect, telecom engineer, DevOps mentor, and technical interviewer combined.
+
+I am a fresher with basic exposure to:
+
+* Linux and shell scripting
+* IP networking fundamentals
+* Virtualization and NFV concepts
+* Docker and Kubernetes (conceptual)
+* SDN and network automation (theoretical)
+* Python basics (scripts and APIs)
+
+I have limited hardware resources (low RAM and storage) and need a solution that is:
+
+* Lightweight
+* Deterministic
+* Industry-aligned
+* Interview-safe
+* Guaranteed to work on modern systems
+
+My goal is to rebuild and deeply understand the following project from scratch and be able to confidently explain every design decision:
+
+SDN-Based Traffic Steering Using Open vSwitch and SDN Controller
+
+Critical background you must assume:
+
+* Running Open vSwitch as Docker containers on Windows is no longer viable due to image deprecation and containerd limitations.
+* ONOS running in Docker on Windows can start successfully but may fail to establish reliable OpenFlow southbound connectivity.
+* Mininet VM provides a stable, native Open vSwitch data plane and must be preferred.
+* Previous failures were architectural and platform-induced, not syntax errors.
+* Passive controller mode (ptcp) and fail_mode=secure caused complete traffic blackholing.
+* Control-plane determinism is more important than feature richness.
+
+Hard requirements:
+
+1. Teach step by step, assuming no hidden knowledge.
+2. For every component, explain:
+
+   * What problem existed before
+   * Why older approaches fail
+   * Why this choice works now
+3. Explicitly state what not to do and why.
+4. Prefer fewer components over complex stacks.
+5. Continuously think like an interviewer trying to expose gaps.
+6. Use Mininet VM as the data plane.
+7. Choose a controller approach that guarantees OpenFlow handshake reliability.
+
+Deliver the project in this order:
+
+1. Finalize the correct project title
+2. Explain SDN traffic steering from first principles
+3. Choose the controller and justify it against alternatives
+4. Present the final architecture
+5. Build the environment step by step
+6. Verify control-plane and data-plane correctness
+7. Implement traffic steering
+8. Prepare viva and interview explanations
+9. Suggest realistic extensions without implementing them
+
+Do not rush. Do not assume. Do not hand-wave.
+Teach me like you are training a junior SDN engineer whose career depends on this project.
+
+────────────────────────────────────────────
+RECOMMENDED FINAL PROJECT TITLE
+────────────────────────────────────────────
+
+Primary recommendation (clean and defensible):
+
+SDN-Based Traffic Steering Using Open vSwitch and Ryu Controller
+
+Why this title:
+
+* Explicitly names the controller
+* Matches what will actually be implemented
+* Avoids ambiguity during evaluation
+* Aligns with academic and lab practices
+
+Optional advanced variant (only if needed later):
+
+Dynamic Traffic Steering in Software-Defined Networks Using Open vSwitch and Programmable SDN Controller
+
+────────────────────────────────────────────
+FINAL ARCHITECTURE (LOCK THIS IN)
+────────────────────────────────────────────
+
+Windows Host
+
+* Docker Desktop (optional, not required for controller)
+* Browser for visualization and testing
+
+Mininet VM (single VM, primary workspace)
+
+* Native Open vSwitch (kernel-based)
+* Mininet topology and hosts
+* SDN controller running locally in VM
+
+Architecture principles:
+
+* One VM only
+* No Dockerized OVS
+* No cross-host OpenFlow if avoidable
+* Deterministic control-plane handshake
+* Minimal moving parts
+
+────────────────────────────────────────────
+CONTROLLER DECISION (FINAL)
+────────────────────────────────────────────
+
+Chosen controller: Ryu
+
+Reasons:
+
+* Native Python execution
+* Direct OpenFlow 1.3 support
+* No container orchestration issues
+* Deterministic switch discovery
+* Ideal for traffic steering demonstrations
+* Easier to explain in viva and interviews
+
+Explicitly not using:
+
+* ONOS in Docker on Windows (handshake instability)
+* OpenDaylight (heavy, outdated for this scope)
+* Docker-based controllers (unnecessary complexity)
+
+────────────────────────────────────────────
+NON-NEGOTIABLE RULES (DO NOT BREAK)
+────────────────────────────────────────────
+
+1. Do not run Open vSwitch inside Docker on Windows.
+2. Do not rely on Docker container IPs for Mininet connectivity.
+3. Do not use ptcp passive controller mode.
+4. Do not leave fail_mode as secure without a confirmed controller.
+5. Do not add tools unless they solve a real problem.
+6. Verify each layer before moving forward.
+
+────────────────────────────────────────────
+RESTART EXECUTION PLAN (HIGH LEVEL)
+────────────────────────────────────────────
+
+Phase 1: Environment sanity
+
+* Use Mininet VM
+* Verify OVS version
+* Verify Python and pip
+* Verify Mininet works standalone
+
+Phase 2: Controller setup
+
+* Install Ryu
+* Start simple_switch_13
+* Confirm controller listening on 6653
+
+Phase 3: Control-plane verification
+
+* Start Mininet with remote controller
+* Confirm switch registration
+* Confirm flows installed
+* Confirm pingall success
+
+Phase 4: Traffic steering
+
+* Write custom Ryu app
+* Match on IP pairs
+* Explicit output port steering
+* Live rule updates
+
+Phase 5: Validation and explanation
+
+* Dump flows
+* Explain match-action logic
+* Explain control vs data plane
+* Prepare screenshots and logs
+
+────────────────────────────────────────────
+WHAT THIS PROJECT WILL PROVE
+────────────────────────────────────────────
+
+* You understand SDN beyond buzzwords
+* You can reason about control-plane failures
+* You know why certain tools fail in practice
+* You can design within constraints
+* You can explain engineering trade-offs clearly
+
